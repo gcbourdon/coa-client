@@ -1,0 +1,11 @@
+services:
+  coa-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Point this at wherever coa-server is running.
+      # Use host.docker.internal to reach a server on your host machine.
+      BACKEND_URL: "${BACKEND_URL:-http://host.docker.internal:8080}"
+    ports:
+      - "3000:80"
