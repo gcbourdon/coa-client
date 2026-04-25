@@ -10,6 +10,7 @@ interface Props {
 const PHASE_LABELS: Record<Phase, string> = {
   ready: 'Ready',
   main: 'Main',
+  combat: 'Combat',
   end: 'End',
 }
 

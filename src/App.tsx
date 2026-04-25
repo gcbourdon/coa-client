@@ -12,7 +12,8 @@ import { CombatOverlay } from './components/Combat/CombatOverlay'
 import { CoinFlipOverlay } from './components/HUD/CoinFlipOverlay'
 import { DeckPile } from './components/HUD/DeckPile'
 import { SequenceView } from './components/HUD/SequenceView'
-import type { CreateGameRequest, CreateGameResponse, DeckSummary, DeckDef } from './types/game'
+import type { CreateGameRequest, CreateGameResponse, DeckSummary, DeckDef, PlayerIndex } from './types/game'
+import { baseRow } from './utils/boardUtils'
 
 const ARCHETYPE_COLORS: Record<string, string> = {
   aggro:    'border-red-600 hover:border-red-400',
@@ -411,6 +412,65 @@ function StructurePlacementPicker({ structureIds, placement, onChange }: Structu
   )
 }
 
+// --- Play confirmation bar ---
+
+function PlayConfirmBar({ cardId, targetCol, onConfirm, onBack, onCancel }: {
+  cardId: string | undefined
+  targetCol: number
+  onConfirm: () => void
+  onBack: () => void
+  onCancel: () => void
+}) {
+  const colLabel = (['Left', 'Center', 'Right'])[targetCol] ?? `Col ${targetCol}`
+  const defs = useCardDefs(cardId ? [cardId] : [])
+  const name = cardId ? (defs.get(cardId)?.name ?? cardId) : '—'
+
+  return (
+    <div className="flex items-center gap-3 bg-amber-950/50 border border-amber-700 rounded-lg px-3 py-2">
+      <span className="text-xs text-amber-300 font-semibold truncate flex-1">
+        Deploy <span className="text-white">{name}</span> → {colLabel} column
+      </span>
+      <button
+        onClick={onCancel}
+        className="text-xs text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 transition-colors shrink-0"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={onBack}
+        className="text-xs text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 transition-colors shrink-0"
+      >
+        Change Target
+      </button>
+      <button
+        onClick={onConfirm}
+        className="text-xs text-white font-semibold bg-green-700 hover:bg-green-600 rounded px-3 py-1 transition-colors shrink-0"
+      >
+        Play
+      </button>
+    </div>
+  )
+}
+
+// --- Rejection toast ---
+
+function RejectionToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const id = setTimeout(onDismiss, 2000)
+    return () => clearTimeout(id)
+  }, [message, onDismiss])
+
+  return (
+    <div
+      key={message}
+      className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-900/90 border border-red-600 rounded-lg px-4 py-2 text-red-200 text-sm z-50 cursor-pointer shadow-xl animate-[fadeOut_2s_ease-in_forwards]"
+      onClick={onDismiss}
+    >
+      {message}
+    </div>
+  )
+}
+
 // --- Game screen ---
 
 interface GameScreenProps {
@@ -423,7 +483,9 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
   const myPlayerIndex = useGameStore((s) => s.myPlayerIndex)
   const lastRejection = useGameStore((s) => s.lastRejection)
   const setLastRejection = useGameStore((s) => s.setLastRejection)
+  const mode = useGameStore((s) => s.mode)
   const setMode = useGameStore((s) => s.setMode)
+  const setValidTargets = useGameStore((s) => s.setValidTargets)
   const [coinFlipDone, setCoinFlipDone] = useState(false)
 
   const { sendAction } = useGameSocket(gameId, playerId)
@@ -433,6 +495,17 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
         Connecting…
+      </div>
+    )
+  }
+
+  if (gameState.status === 'waiting') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray-400">
+          <div className="text-lg">Waiting for opponent to connect…</div>
+          <div className="text-xs text-gray-600">Game ID: {gameState.gameId}</div>
+        </div>
       </div>
     )
   }
@@ -479,12 +552,10 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
       )}
 
       {lastRejection && (
-        <div
-          className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-900/90 border border-red-600 rounded-lg px-4 py-2 text-red-200 text-sm z-50 cursor-pointer shadow-xl"
-          onClick={() => setLastRejection(null)}
-        >
-          {lastRejection.message}
-        </div>
+        <RejectionToast
+          message={lastRejection.message}
+          onDismiss={() => setLastRejection(null)}
+        />
       )}
 
       {/* Opponent */}
@@ -494,8 +565,8 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
         <span className="text-xs text-gray-500">{opponentPlayer.hand.length} cards in hand</span>
       </div>
 
-      {/* Board + Sequence sidebar */}
-      <div className="flex gap-3 items-start">
+      {/* Board + Sequence sidebar — sidebar always reserves space to prevent layout shift */}
+      <div className="flex gap-3 items-center">
         <div className="flex-1 min-w-0">
           <Board
             gameState={gameState}
@@ -505,16 +576,15 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
             onDeclareAttack={handleDeclareAttack}
           />
         </div>
-        {(gameState.sequence?.length ?? 0) > 0 && (
-          <div className="w-44 shrink-0">
-            <SequenceView
-              sequence={gameState.sequence}
-              priorityPlayer={gameState.priorityPlayer}
-              myPlayerIndex={myPlayerIndex}
-              onPassPriority={actions.passPriority}
-            />
-          </div>
-        )}
+        <div className="w-44 shrink-0 self-center">
+          <SequenceView
+            sequence={gameState.sequence ?? []}
+            priorityPlayer={gameState.priorityPlayer}
+            myPlayerIndex={myPlayerIndex}
+            stagedPlay={null}
+            onPassPriority={actions.passPriority}
+          />
+        </div>
       </div>
 
       {/* My controls */}
@@ -539,9 +609,32 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
         </div>
       </div>
 
+      {/* Play confirmation bar — shown when a deploy target has been staged */}
+      {mode.type === 'card_targeted' && (
+        <PlayConfirmBar
+          cardId={myPlayer.hand.find((c) => c.instanceId === mode.cardInstanceId)?.cardId}
+          targetCol={mode.targetCol}
+          onConfirm={() => {
+            // Active player retains priority after playing — they must explicitly pass
+            // via the sequence view to give the opponent a chance to respond.
+            handlePlayCard(mode.cardInstanceId, mode.targetCol, mode.targetRow)
+            setMode({ type: 'idle' })
+          }}
+          onBack={() => {
+            const row = baseRow(myPlayerIndex)
+            const targets = [0, 1, 2]
+              .filter((col) => gameState.board.grid[col]?.[row] == null)
+              .map((col) => ({ col, row }))
+            setMode({ type: 'card_selected', cardInstanceId: mode.cardInstanceId })
+            setValidTargets(targets)
+          }}
+          onCancel={() => setMode({ type: 'idle' })}
+        />
+      )}
+
       {/* Hand */}
       <div className="bg-gray-800/40 rounded-lg p-3">
-        <Hand cards={myPlayer.hand} myPlayerIndex={myPlayerIndex} isMyTurn={isMyTurn} />
+        <Hand cards={myPlayer.hand} myPlayerIndex={myPlayerIndex} myAP={myPlayer.ap} isMyTurn={isMyTurn} boardGrid={gameState.board.grid} />
       </div>
 
       {/* Log */}

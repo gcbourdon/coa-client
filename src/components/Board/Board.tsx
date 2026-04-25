@@ -1,4 +1,4 @@
-import type { GameState, ConquerorInstance, PlayerIndex } from '../../types/game'
+import type { GameState, ConquerorInstance, PlayerIndex, SequenceItem } from '../../types/game'
 import { Cell } from './Cell'
 import { useGameStore } from '../../store/gameStore'
 import { validMoveTargets, baseRow, structureRow } from '../../utils/boardUtils'
@@ -19,7 +19,9 @@ interface Props {
 export function Board({ gameState, myPlayerIndex, onPlayCard, onMoveConqueror, onDeclareAttack }: Props) {
   const mode = useGameStore((s) => s.mode)
   const setMode = useGameStore((s) => s.setMode)
+  const setCardTargeted = useGameStore((s) => s.setCardTargeted)
   const setValidTargets = useGameStore((s) => s.setValidTargets)
+  const setLastRejection = useGameStore((s) => s.setLastRejection)
   const isMyTurn = gameState.currentTurn === myPlayerIndex && gameState.phase === 'main'
 
   // Collect all unique card IDs visible on the board for bulk def lookup.
@@ -49,8 +51,11 @@ export function Board({ gameState, myPlayerIndex, onPlayCard, onMoveConqueror, o
         setMode({ type: 'idle' })
         return
       }
-      // Select this conqueror — show move targets
       const targets = validMoveTargets(conqueror, gameState.board.grid, myPlayerIndex)
+      if (targets.length === 0 && conqueror.movesUsed >= conqueror.currentSpd) {
+        setLastRejection({ reason: 'MOVE_LIMIT_REACHED', message: `This conqueror has already moved ${conqueror.currentSpd} time(s) this turn.` })
+        return
+      }
       setMode({ type: 'conqueror_selected', conquerorInstanceId: conqueror.instanceId })
       setValidTargets(targets)
     }
@@ -65,11 +70,19 @@ export function Board({ gameState, myPlayerIndex, onPlayCard, onMoveConqueror, o
     if (!isMyTurn) return
 
     if (mode.type === 'card_selected') {
-      // Place the card if valid deploy row
+      // Stage the target — wait for explicit confirmation before sending to server.
       const myBase = baseRow(myPlayerIndex)
       if (row === myBase && gameState.board.grid[col]?.[row] == null) {
-        onPlayCard(mode.cardInstanceId, col, row)
-        setMode({ type: 'idle' })
+        setCardTargeted(mode.cardInstanceId, col, row)
+      }
+      return
+    }
+
+    if (mode.type === 'card_targeted') {
+      // Clicking a different valid deploy cell updates the staged target.
+      const myBase = baseRow(myPlayerIndex)
+      if (row === myBase && gameState.board.grid[col]?.[row] == null) {
+        setCardTargeted(mode.cardInstanceId, col, row)
       }
       return
     }
@@ -116,6 +129,15 @@ export function Board({ gameState, myPlayerIndex, onPlayCard, onMoveConqueror, o
             structure = gameState.players[1].structures[col] ?? null
           }
 
+          const isChosenTarget =
+            mode.type === 'card_targeted' &&
+            mode.targetCol === col &&
+            mode.targetRow === row
+
+          // A committed sequence item targeting this cell (from either player).
+          const sequenceTarget: SequenceItem | null =
+            gameState.sequence?.find((s) => s.targetCol === col && s.targetRow === row) ?? null
+
           return (
             <Cell
               key={`${col}-${row}`}
@@ -125,6 +147,8 @@ export function Board({ gameState, myPlayerIndex, onPlayCard, onMoveConqueror, o
               structure={structure}
               myPlayerIndex={myPlayerIndex}
               defMap={defMap}
+              isChosenTarget={isChosenTarget}
+              sequenceTarget={sequenceTarget}
               onCellClick={handleCellClick}
               onConquerorClick={handleConquerorClick}
             />

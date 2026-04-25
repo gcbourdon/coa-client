@@ -49,17 +49,16 @@ export function validMoveTargets(
   grid: (ConquerorInstance | null)[][],
   myPlayerIndex: PlayerIndex
 ): { col: number; row: number }[] {
+  const remaining = conqueror.currentSpd - conqueror.movesUsed
+  if (remaining <= 0) return []
+
   const targets: { col: number; row: number }[] = []
-  const spd = conqueror.currentSpd
   const opponentBase = baseRow(myPlayerIndex === 1 ? 2 : 1)
 
-  for (let dc = -spd; dc <= spd; dc++) {
-    for (let dr = -spd; dr <= spd; dr++) {
+  for (let dc = -remaining; dc <= remaining; dc++) {
+    for (let dr = -remaining; dr <= remaining; dr++) {
       if (dc === 0 && dr === 0) continue
-      // Only horizontal or vertical movement (Manhattan, no diagonals in one step)
-      // SPD means "how many positions per move action" — movement is one step H or V per AP
-      // For simplicity treat each step as one H or V move
-      if (Math.abs(dc) + Math.abs(dr) > spd) continue
+      if (Math.abs(dc) + Math.abs(dr) > remaining) continue
       const nc = conqueror.col + dc
       const nr = conqueror.row + dr
       if (nc < 0 || nc > 2 || nr < 0 || nr > 3) continue

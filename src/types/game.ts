@@ -22,7 +22,8 @@ export interface CardDef {
 }
 
 export type PlayerIndex = 0 | 1 | 2 // 0 = no winner / in progress, 1 = Player1, 2 = Player2
-export type Phase = 'ready' | 'main' | 'end'
+export type GameStatus = 'waiting' | 'in_progress' | 'finished'
+export type Phase = 'ready' | 'main' | 'combat' | 'end'
 export type Keyword = 'rush' | 'rend' | 'taunt' | 'intercept' | 'steadfast' | 'fury' | 'overwhelm'
 
 export interface CardInstance {
@@ -58,6 +59,7 @@ export interface ConquerorInstance {
   col: number
   row: number
   isWeary: boolean
+  movesUsed: number
   currentAtk: number
   currentDef: number
   currentHp: number
@@ -97,6 +99,7 @@ export interface SequenceItem {
 
 export interface GameState {
   gameId: string
+  status: GameStatus
   players: Player[]  // index 0 = Player1, index 1 = Player2
   board: Board
   currentTurn: PlayerIndex

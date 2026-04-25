@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@keyframes fadeOut {
+  0%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 * {
   box-sizing: border-box;
 }

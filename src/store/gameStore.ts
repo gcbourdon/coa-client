@@ -9,6 +9,7 @@ export interface Position {
 export type InteractionMode =
   | { type: 'idle' }
   | { type: 'card_selected'; cardInstanceId: string }
+  | { type: 'card_targeted'; cardInstanceId: string; targetCol: number; targetRow: number }
   | { type: 'conqueror_selected'; conquerorInstanceId: string }
   | { type: 'declaring_attackers'; attackers: { conquerorId: string; targetCol: number; targetRow: number }[] }
   | { type: 'assigning_defenders'; attackers: { conquerorId: string; targetCol: number; targetRow: number }[]; assignments: Record<string, string> }
@@ -46,6 +47,8 @@ interface GameStore {
   setGameState: (state: GameState) => void
   resolvePlayerIndex: (playerId: string, state: GameState) => void
   setMode: (mode: InteractionMode) => void
+  // Transition to card_targeted without clearing validTargets (so other valid cells stay highlighted).
+  setCardTargeted: (cardInstanceId: string, targetCol: number, targetRow: number) => void
   setValidTargets: (targets: Position[]) => void
   addLog: (text: string) => void
   setLastCombatResult: (result: CombatResultPayload | null) => void
@@ -84,6 +87,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   setMode: (mode) => set({ mode, validTargets: [] }),
+
+  setCardTargeted: (cardInstanceId, targetCol, targetRow) =>
+    set((s) => ({ mode: { type: 'card_targeted', cardInstanceId, targetCol, targetRow }, validTargets: s.validTargets })),
 
   setValidTargets: (targets) => set({ validTargets: targets }),
 

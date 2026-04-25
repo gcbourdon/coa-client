@@ -9,7 +9,12 @@ export function useCardDefs(cardIds: string[]): Map<string, CardDef> {
 
   useEffect(() => {
     const missing = [...new Set(cardIds)].filter((id) => !cache.has(id))
-    if (missing.length === 0) return
+    if (missing.length === 0) {
+      // All IDs already in cache — sync local state in case another component populated the cache
+      // after this component mounted (e.g. hand fetched defs before a conqueror was deployed).
+      setDefs(new Map(cache))
+      return
+    }
 
     const params = new URLSearchParams({ cardIDs: missing.join(',') })
     fetch(`/api/v1/cards?${params}`)
