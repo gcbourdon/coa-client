@@ -113,8 +113,9 @@ export function Board({ gameState, myPlayerIndex, onPlayCard, onMoveConqueror, o
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
         gridTemplateRows: 'repeat(4, 1fr)',
-        width: '100%',
         aspectRatio: '3 / 4',
+        height: '100%',
+        maxWidth: '100%',
       }}
     >
       {ROWS.map((row) =>

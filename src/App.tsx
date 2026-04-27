@@ -542,7 +542,7 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col p-3 gap-3 max-w-3xl mx-auto">
+    <div className="h-svh overflow-hidden flex flex-col p-3 gap-2 max-w-3xl mx-auto">
       {showCoinFlip && (
         <CoinFlipOverlay
           firstPlayer={gameState.firstPlayer}
@@ -559,15 +559,15 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
       )}
 
       {/* Opponent */}
-      <div className="flex items-center justify-between bg-gray-800/60 rounded-lg px-3 py-2">
+      <div className="flex items-center justify-between bg-gray-800/60 rounded-lg px-3 py-2 shrink-0">
         <span className="text-sm text-gray-400">Opponent (P{opponentIndex})</span>
         <APBar ap={opponentPlayer.ap} isMyTurn={!isMyTurn} />
         <span className="text-xs text-gray-500">{opponentPlayer.hand.length} cards in hand</span>
       </div>
 
-      {/* Board + Sequence sidebar — sidebar always reserves space to prevent layout shift */}
-      <div className="flex gap-3 items-center">
-        <div className="flex-1 min-w-0">
+      {/* Board + Sequence sidebar */}
+      <div className="flex gap-3 items-stretch flex-1 min-h-0">
+        <div className="flex-1 min-w-0 h-full flex items-center justify-center">
           <Board
             gameState={gameState}
             myPlayerIndex={myPlayerIndex}
@@ -588,7 +588,7 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
       </div>
 
       {/* My controls */}
-      <div className="flex flex-wrap items-center gap-3 bg-gray-800/60 rounded-lg px-3 py-2">
+      <div className="flex flex-wrap items-center gap-3 bg-gray-800/60 rounded-lg px-3 py-2 shrink-0">
         <span className="text-sm text-gray-400">You (P{myPlayerIndex})</span>
         <APBar ap={myPlayer.ap} isMyTurn={isMyTurn} />
         <PhaseIndicator
@@ -633,12 +633,12 @@ function GameScreen({ gameId, playerId }: GameScreenProps) {
       )}
 
       {/* Hand */}
-      <div className="bg-gray-800/40 rounded-lg p-3">
+      <div className="bg-gray-800/40 rounded-lg p-2 shrink-0">
         <Hand cards={myPlayer.hand} myPlayerIndex={myPlayerIndex} myAP={myPlayer.ap} isMyTurn={isMyTurn} boardGrid={gameState.board.grid} />
       </div>
 
       {/* Log */}
-      <div className="bg-gray-900/60 rounded-lg p-3">
+      <div className="bg-gray-900/60 rounded-lg p-2 shrink-0 max-h-20 overflow-y-auto">
         <div className="text-xs text-gray-500 mb-1 font-semibold uppercase tracking-wide">Log</div>
         <ActionLog />
       </div>
